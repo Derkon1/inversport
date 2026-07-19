@@ -188,8 +188,141 @@ class NominasView:
         self._crear_boton(btn_frame, "MODIFICAR", self._modificar_produccion, 'warning').pack(side='left', padx=2)
         self._crear_boton(btn_frame, "ELIMINAR", self._eliminar_produccion, 'danger').pack(side='left', padx=2)
         self._crear_boton(btn_frame, "CALCULAR NÓMINA", self._abrir_calculo_nomina, 'info').pack(side='left', padx=2)
+        self._crear_boton(btn_frame, "📊 EXPORTAR EXCEL", self._exportar_produccion_excel, 'info').pack(side='left', padx=2)
 
         self._actualizar_listas_combos()
+
+    def _exportar_produccion_excel(self):
+        """Exporta los registros de producción visibles en la tabla a un archivo Excel."""
+        seleccion = self.combo_nomina_trabajador.get()
+        if not seleccion:
+            self._mostrar_mensaje("⚠️ Seleccione un trabajador para exportar", 'warning')
+            return
+
+        try:
+            import openpyxl
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+        except ImportError:
+            self._mostrar_mensaje("La librería openpyxl no está instalada. Instálala con: pip install openpyxl", 'error')
+            return
+
+        items = self.tree_produccion.get_children()
+        if not items:
+            self._mostrar_mensaje("No hay registros de producción para exportar", 'warning')
+            return
+
+        cedula = seleccion.split(" - ")[0]
+        trabajador = self.nomina.trabajadores.get(cedula)
+        if not trabajador:
+            self._mostrar_mensaje("Trabajador no encontrado", 'error')
+            return
+
+        archivo = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+            title="Guardar producción de trabajador",
+            initialfile=f"Produccion_{trabajador.nombres}_{trabajador.apellidos}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        )
+        if not archivo:
+            return
+
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Producción"
+
+            # Estilos
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+            header_alignment = Alignment(horizontal='center', vertical='center')
+            center_alignment = Alignment(horizontal='center', vertical='center')
+            money_alignment = Alignment(horizontal='right', vertical='center')
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+
+            # Título
+            ws.merge_cells('A1:H1')
+            title_cell = ws['A1']
+            title_cell.value = f"INVERSPORT - REGISTRO DE PRODUCCIÓN"
+            title_cell.font = Font(size=14, bold=True)
+            title_cell.alignment = Alignment(horizontal='center')
+            
+            ws.merge_cells('A2:H2')
+            info_cell = ws['A2']
+            info_cell.value = f"Trabajador: {trabajador.nombre} | Cédula: {cedula} | Cargo: {trabajador.cargo}"
+            info_cell.font = Font(size=11)
+            info_cell.alignment = Alignment(horizontal='center')
+
+            ws.merge_cells('A3:H3')
+            fecha_cell = ws['A3']
+            fecha_cell.value = f"Fecha de exportación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+            fecha_cell.font = Font(size=10)
+            fecha_cell.alignment = Alignment(horizontal='center')
+
+            # Encabezados
+            headers = ['Fecha', 'Ticket', 'Referencia', 'Color', 'Pares', 'Pedido', 'Precio', 'Total']
+            for col_idx, header in enumerate(headers, start=1):
+                cell = ws.cell(row=5, column=col_idx, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = thin_border
+
+            # Datos
+            total_general = 0
+            for row_idx, item in enumerate(items, start=6):
+                values = self.tree_produccion.item(item, 'values')
+                for col_idx, value in enumerate(values, start=1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    cell.alignment = center_alignment
+                    cell.border = thin_border
+                    
+                    # Formato de moneda para Precio y Total
+                    if col_idx == 7 or col_idx == 8:
+                        try:
+                            valor_limpio = value.replace('$', '').replace('.', '').replace(',', '.')
+                            cell.value = float(valor_limpio)
+                            cell.number_format = '#,##0.00 "Bs"'
+                            cell.alignment = money_alignment
+                            if col_idx == 8:
+                                total_general += float(valor_limpio)
+                        except:
+                            pass
+
+            # Total general
+            row_total = 6 + len(items)
+            ws.merge_cells(f'A{row_total}:G{row_total}')
+            total_label = ws.cell(row=row_total, column=1, value="TOTAL GENERAL")
+            total_label.font = Font(bold=True)
+            total_label.alignment = Alignment(horizontal='right')
+            total_label.border = thin_border
+            
+            total_cell = ws.cell(row=row_total, column=8, value=total_general)
+            total_cell.font = Font(bold=True)
+            total_cell.number_format = '#,##0.00 "Bs"'
+            total_cell.alignment = money_alignment
+            total_cell.border = thin_border
+
+            # Ajustar anchos de columna
+            for col_idx in range(1, 9):
+                col_letter = get_column_letter(col_idx)
+                ws.column_dimensions[col_letter].width = 15
+            ws.column_dimensions['B'].width = 12  # Ticket más angosto
+            ws.column_dimensions['D'].width = 12  # Color
+            ws.column_dimensions['E'].width = 10  # Pares
+            ws.column_dimensions['F'].width = 10  # Pedido
+
+            wb.save(archivo)
+            self._mostrar_mensaje(f"Producción exportada correctamente a {archivo}", 'success')
+            
+        except Exception as e:
+            self._mostrar_mensaje(f"Error al exportar: {str(e)}", 'error')
 
     def _cargar_produccion_trabajador(self, event=None):
         seleccion = self.combo_nomina_trabajador.get()
@@ -479,7 +612,6 @@ class NominasView:
                                bg=self.colors['input_bg'], fg=self.colors['text_light'])
         entry_inces.grid(row=3, column=3, sticky='ew', padx=2, pady=2)
 
-        # Botón calcular
         btn_calcular = self._crear_boton(main_frame, "CALCULAR", 
                                          lambda: self._procesar_calculo_nomina(
                                              top, combo_trab, periodo_var, salario_minimo_var,
