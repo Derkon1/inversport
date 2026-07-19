@@ -1,3 +1,4 @@
+# inver/views/components/historial.py
 import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
@@ -61,6 +62,7 @@ class HistorialView:
         self._cargar_historial(cedula, fecha)
 
     def _cargar_historial(self, cedula, fecha):
+        """Carga el historial desde la base de datos."""
         trabajador = self.nomina.trabajadores.get(cedula)
         if not trabajador:
             self._mostrar_mensaje("Trabajador no encontrado", 'error')
@@ -69,31 +71,62 @@ class HistorialView:
         for item in self.tree_registros.get_children():
             self.tree_registros.delete(item)
 
+        # Intentar cargar desde la base de datos
+        if hasattr(self.nomina, 'db_manager') and self.nomina.db_manager:
+            # Obtener id_registro de registro_diario
+            id_registro = self.nomina.db_manager.obtener_id_registro_por_cedula(cedula, fecha)
+            if id_registro:
+                historial = self.nomina.db_manager.obtener_historial_por_fecha(id_registro, fecha)
+                if historial:
+                    # Buscar el registro diario para mostrar entrada/salida
+                    registro = trabajador.get_registro_por_fecha(fecha)
+                    entrada_formateada = '--'
+                    salida_formateada = '--'
+                    horas = '-'
+                    faltas = historial.get('faltas_injustificadas', 0)
+                    
+                    if registro:
+                        entrada_formateada = self._formato_hora_12h(registro.hora_entrada)
+                        salida_formateada = self._formato_hora_12h(registro.hora_salida) if registro.hora_salida else '--'
+                        horas = trabajador.get_horas_trabajadas_hoy() if registro.hora_salida else '-'
+                    
+                    self.tree_registros.insert('', 'end', values=(
+                        historial['fecha'],
+                        entrada_formateada,
+                        salida_formateada,
+                        horas if horas != '-' else '0',
+                        faltas
+                    ))
+                    return
+
+        # Fallback: calcular en memoria y guardar
         registro = trabajador.get_registro_por_fecha(fecha)
         es_falta = 0
+        
         if registro:
             horas = trabajador.get_horas_trabajadas_hoy() if registro.hora_salida else '-'
             entrada_formateada = self._formato_hora_12h(registro.hora_entrada)
             salida_formateada = self._formato_hora_12h(registro.hora_salida) if registro.hora_salida else '--'
-            es_falta = 0
-            self.tree_registros.insert('', 'end', values=(
-                fecha, entrada_formateada, salida_formateada, horas, es_falta
-            ))
         else:
+            entrada_formateada = 'No registró'
+            salida_formateada = '--'
+            horas = '-'
             fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
             hoy = datetime.now().date()
             if fecha_obj.weekday() < 5:
                 if fecha_obj == hoy:
                     hora_actual = datetime.now().time()
                     hora_limite = datetime.strptime(self.HORA_LIMITE, "%H:%M").time()
-                    if hora_actual >= hora_limite:
-                        es_falta = 1
-                    else:
-                        es_falta = 0
+                    es_falta = 1 if hora_actual >= hora_limite else 0
                 else:
                     es_falta = 1
-            else:
-                es_falta = 0
-            self.tree_registros.insert('', 'end', values=(
-                fecha, 'No registró', '--', '-', es_falta
-            ))
+        
+        # Guardar en la base de datos si hay conexión
+        if hasattr(self.nomina, 'db_manager') and self.nomina.db_manager:
+            id_registro = self.nomina.db_manager.obtener_id_registro_por_cedula(cedula, fecha)
+            if id_registro:
+                self.nomina.db_manager.guardar_historial(id_registro, fecha, es_falta)
+        
+        self.tree_registros.insert('', 'end', values=(
+            fecha, entrada_formateada, salida_formateada, horas, es_falta
+        ))

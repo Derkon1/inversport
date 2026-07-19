@@ -43,6 +43,32 @@ CREATE TABLE IF NOT EXISTS `expediente` (
   CONSTRAINT `expediente_ibfk_1` FOREIGN KEY (`cedula`) REFERENCES `trabajador` (`cedula`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
+INSERT INTO `expediente` (`cedula`, `nombre_emergencia`, `parentesco_emergencia`, `telefono_emergencia`, `tiene_condiciones`, `descripcion_condiciones`, `foto_path`, `fecha_nacimiento`, `direccion`, `telefono`, `correo`, `numero_hijos`) VALUES
+	('31357080', 'ksajlsdh', 'ashsjs', '023546546', 0, '', 'C:/Users/PROTO/Downloads/diego.jpg', '2000-07-28', 'vhgkvlkjhj', '054223', 'skgcbjdgcdg@gmail.com', 600);
+
+CREATE TABLE IF NOT EXISTS `historial` (
+  `Id_ historia` int(11) NOT NULL AUTO_INCREMENT,
+  `Id_registro` int(11) DEFAULT NULL,
+  `Faltas_injustificadas` int(11) DEFAULT NULL,
+  `Fecha` date DEFAULT NULL,
+  PRIMARY KEY (`Id_ historia`),
+  KEY `FK_Historial_registro_diario` (`Id_registro`),
+  CONSTRAINT `FK_Historial_registro_diario` FOREIGN KEY (`Id_registro`) REFERENCES `registro_diario` (`id_registro`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+INSERT INTO `historial` (`Id_ historia`, `Id_registro`, `Faltas_injustificadas`, `Fecha`) VALUES
+	(1, 8, 0, '2026-07-12'),
+	(2, 3, 0, '2026-07-12'),
+	(3, 6, 0, '2026-07-12'),
+	(4, 9, 0, '2026-07-17'),
+	(5, 8, 0, '2026-07-12'),
+	(6, 3, 0, '2026-07-12'),
+	(7, 6, 0, '2026-07-12'),
+	(8, 9, 0, '2026-07-17'),
+	(9, 8, 0, '2026-07-12'),
+	(10, 3, 0, '2026-07-12'),
+	(11, 6, 0, '2026-07-12'),
+	(12, 9, 0, '2026-07-17');
 
 CREATE TABLE IF NOT EXISTS `nomina` (
   `id_nomina` int(11) NOT NULL AUTO_INCREMENT,
@@ -92,8 +118,11 @@ CREATE TABLE IF NOT EXISTS `permiso` (
   PRIMARY KEY (`id_permiso`),
   KEY `cedula` (`cedula`),
   CONSTRAINT `permiso_ibfk_1` FOREIGN KEY (`cedula`) REFERENCES `trabajador` (`cedula`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
+INSERT INTO `permiso` (`id_permiso`, `cedula`, `tipo`, `dias`, `fecha_inicio`, `fecha_fin`, `motivo`) VALUES
+	(2, '32202309', 'Médico', 51, '2026-07-01', '2026-08-20', 'lool'),
+	(4, '32202309', 'Médico', 51, '2026-07-01', '2026-08-20', 'reposo');
 
 CREATE TABLE IF NOT EXISTS `produccion` (
   `id_produccion` int(11) NOT NULL AUTO_INCREMENT,
@@ -109,8 +138,13 @@ CREATE TABLE IF NOT EXISTS `produccion` (
   PRIMARY KEY (`id_produccion`),
   KEY `cedula` (`cedula`),
   CONSTRAINT `produccion_ibfk_1` FOREIGN KEY (`cedula`) REFERENCES `trabajador` (`cedula`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
+INSERT INTO `produccion` (`id_produccion`, `cedula`, `fecha`, `ticket`, `referencia`, `color`, `cantidad`, `pedido`, `precio_unitario`, `total`) VALUES
+	(3, '31357080', '2026-07-12', '54656d', 'wrw', 'rttgtgr', 15, '350000', 700.00, 10500.00),
+	(5, '000111222', '2026-07-12', '001H', 'T41', 'ROJO', 14, '1', 500.00, 7000.00),
+	(6, '000111222', '2026-07-12', '002H', 'T24-4', 'BLANCO', 20, '1', 700.00, 14000.00),
+	(7, '000111222', '2026-07-12', '002H', 'T24-4', 'NEGRO', 20, '1', 700.00, 14000.00);
 
 CREATE TABLE IF NOT EXISTS `registro_diario` (
   `id_registro` int(11) NOT NULL AUTO_INCREMENT,
@@ -121,8 +155,13 @@ CREATE TABLE IF NOT EXISTS `registro_diario` (
   PRIMARY KEY (`id_registro`),
   UNIQUE KEY `unique_registro_dia` (`cedula`,`fecha`),
   CONSTRAINT `registro_diario_ibfk_1` FOREIGN KEY (`cedula`) REFERENCES `trabajador` (`cedula`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
+INSERT INTO `registro_diario` (`id_registro`, `cedula`, `fecha`, `hora_entrada`, `hora_salida`) VALUES
+	(3, '31357080', '2026-07-12', '19:05:15', '19:17:09'),
+	(6, '32070926', '2026-07-12', '19:31:00', NULL),
+	(8, '000111222', '2026-07-12', '20:53:42', '21:12:21'),
+	(9, '32070926', '2026-07-17', '17:51:22', '17:51:35');
 
 CREATE TABLE IF NOT EXISTS `trabajador` (
   `cedula` varchar(20) NOT NULL,
@@ -135,7 +174,9 @@ CREATE TABLE IF NOT EXISTS `trabajador` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 INSERT INTO `trabajador` (`cedula`, `nombres`, `apellidos`, `id_cargo`) VALUES
-	('32070926', 'Jonathan', 'Novoa', 7),
+	('000111222', 'Primer', 'Trabajador', 3),
+	('31357080', 'Edisson', 'Garcia', 2),
+	('32070926', 'Jonathan', 'Novoa', 4),
 	('32202309', 'Diego', 'Garcia', 1);
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

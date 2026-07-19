@@ -2,7 +2,7 @@
 from typing import Optional, Tuple, List, Dict
 from datetime import datetime, timedelta
 from .database import (
-    TrabajadorDB, RegistroDB, PermisoDB, ProduccionDB, ExpedienteDB, NominaDB
+    TrabajadorDB, RegistroDB, PermisoDB, ProduccionDB, ExpedienteDB, NominaDB, HistorialDB
 )
 
 
@@ -16,14 +16,15 @@ class DatabaseManager:
         self.produccion_db = ProduccionDB()
         self.expediente_db = ExpedienteDB()
         self.nomina_db = NominaDB()
+        self.historial_db = HistorialDB()
         
-        # Conectar automáticamente
         self.trabajador_db.connect()
         self.registro_db.connect()
         self.permiso_db.connect()
         self.produccion_db.connect()
         self.expediente_db.connect()
         self.nomina_db.connect()
+        self.historial_db.connect()
 
     def guardar_trabajador(self, trabajador) -> bool:
         """Guarda un trabajador en la base de datos."""
@@ -36,7 +37,6 @@ class DatabaseManager:
 
     def cargar_trabajadores(self, nomina) -> None:
         """Carga todos los trabajadores desde la base de datos a la nómina."""
-        # Importar aquí para evitar circular import
         from .models import Trabajador
         
         trabajadores = self.trabajador_db.obtener_todos_trabajadores()
@@ -221,6 +221,26 @@ class DatabaseManager:
         """Elimina un trabajador y todos sus datos relacionados."""
         return self.trabajador_db.eliminar_trabajador(cedula)
 
+    def guardar_historial(self, id_registro: int, fecha: str, faltas: int = 0) -> bool:
+        """Guarda el historial de un trabajador."""
+        return self.historial_db.guardar_historial(id_registro, fecha, faltas)
+
+    def obtener_historial_por_id_registro(self, id_registro: int, fecha: str = None) -> List[Dict]:
+        """Obtiene el historial por id_registro."""
+        return self.historial_db.obtener_historial_por_id_registro(id_registro, fecha)
+
+    def obtener_historial_por_fecha(self, id_registro: int, fecha: str) -> Optional[Dict]:
+        """Obtiene el historial de un trabajador en una fecha específica."""
+        return self.historial_db.obtener_historial_por_fecha(id_registro, fecha)
+
+    def obtener_id_registro_por_cedula(self, cedula: str, fecha: str) -> Optional[int]:
+        """Obtiene el id_registro de registro_diario por cédula y fecha."""
+        return self.historial_db.obtener_id_registro_por_cedula(cedula, fecha)
+
+    def actualizar_faltas(self, id_registro: int, fecha: str, faltas: int) -> bool:
+        """Actualiza las faltas de un trabajador en una fecha específica."""
+        return self.historial_db.actualizar_faltas(id_registro, fecha, faltas)
+
     def sincronizar_todo(self, nomina) -> None:
         """Sincroniza todos los datos entre la aplicación y la base de datos."""
         self.cargar_trabajadores(nomina)
@@ -228,7 +248,49 @@ class DatabaseManager:
         self.cargar_registros(nomina)
         self.cargar_produccion(nomina)
         self.cargar_expediente(nomina)
+        self._actualizar_historial_faltas(nomina)
         print("✅ Datos sincronizados correctamente")
+
+    def _actualizar_historial_faltas(self, nomina) -> None:
+        """Actualiza el historial de faltas para todos los trabajadores."""
+        hoy = datetime.now().date()
+        fecha_inicio = (hoy - timedelta(days=30)).strftime("%Y-%m-%d")
+        fecha_fin = hoy.strftime("%Y-%m-%d")
+        
+        for cedula, trabajador in nomina.trabajadores.items():
+            for fecha in self._generar_fechas(fecha_inicio, fecha_fin):
+                # Obtener registro diario
+                registro_db = self.registro_db.obtener_registro_dia(cedula, fecha)
+                if not registro_db:
+                    continue
+                
+                id_registro = registro_db['id_registro']
+                registro = trabajador.get_registro_por_fecha(fecha)
+                es_falta = 0
+                
+                if not registro:
+                    fecha_dt = datetime.strptime(fecha, "%Y-%m-%d").date()
+                    if fecha_dt.weekday() < 5:
+                        if fecha_dt < hoy:
+                            es_falta = 1
+                        elif fecha_dt == hoy:
+                            hora_actual = datetime.now().time()
+                            hora_limite = datetime.strptime("17:22", "%H:%M").time()
+                            if hora_actual >= hora_limite:
+                                es_falta = 1
+                
+                self.historial_db.guardar_historial(id_registro, fecha, es_falta)
+
+    def _generar_fechas(self, fecha_inicio: str, fecha_fin: str) -> list:
+        """Genera lista de fechas entre dos fechas."""
+        inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+        fechas = []
+        current = inicio
+        while current <= fin:
+            fechas.append(current.strftime("%Y-%m-%d"))
+            current += timedelta(days=1)
+        return fechas
 
     def cerrar_conexiones(self) -> None:
         """Cierra todas las conexiones a la base de datos."""
@@ -238,3 +300,4 @@ class DatabaseManager:
         self.produccion_db.disconnect()
         self.expediente_db.disconnect()
         self.nomina_db.disconnect()
+        self.historial_db.disconnect()

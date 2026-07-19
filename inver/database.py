@@ -49,7 +49,6 @@ class Database:
                 if not self.connection or not self.connection.is_connected():
                     self.connect()
                 
-                # Usar un cursor nuevo para cada intento
                 cursor = self.connection.cursor(dictionary=True, buffered=True)
                 cursor.execute(query, params or ())
                 
@@ -70,7 +69,6 @@ class Database:
                     except:
                         pass
                 
-                # Si es error de concurrencia, reintentar
                 if "Record has changed since last read" in str(e) or "1020" in str(e):
                     if attempt < max_retries - 1:
                         print(f"⚠️ Reintentando ({attempt + 1}/{max_retries})...")
@@ -160,7 +158,7 @@ class RegistroDB(Database):
     def obtener_registro_dia(self, cedula: str, fecha: str) -> Optional[Dict]:
         """Obtiene el registro de un día específico."""
         query = """
-            SELECT fecha, hora_entrada, hora_salida
+            SELECT id_registro, fecha, hora_entrada, hora_salida
             FROM registro_diario
             WHERE cedula = %s AND fecha = %s
         """
@@ -170,7 +168,7 @@ class RegistroDB(Database):
     def obtener_registros_por_fecha(self, cedula: str, fecha_inicio: str, fecha_fin: str) -> List[Dict]:
         """Obtiene registros en un rango de fechas."""
         query = """
-            SELECT fecha, hora_entrada, hora_salida
+            SELECT id_registro, fecha, hora_entrada, hora_salida
             FROM registro_diario
             WHERE cedula = %s AND fecha BETWEEN %s AND %s
             ORDER BY fecha
@@ -325,6 +323,12 @@ class ExpedienteDB(Database):
         """
         result = self.execute_query(query, (cedula,))
         return result[0] if result else None
+    
+    def eliminar_expediente(self, cedula: str) -> bool:
+        """Elimina el expediente de un trabajador."""
+        query = "DELETE FROM expediente WHERE cedula = %s"
+        result = self.execute_query(query, (cedula,))
+        return result is None
 
 
 class NominaDB(Database):
@@ -362,3 +366,63 @@ class NominaDB(Database):
             SELECT * FROM nomina WHERE cedula = %s ORDER BY fecha_inicio DESC
         """
         return self.execute_query(query, (cedula,)) or []
+
+
+class HistorialDB(Database):
+    """Operaciones CRUD para historial de faltas."""
+    
+    def guardar_historial(self, id_registro: int, fecha: str, faltas: int = 0) -> bool:
+        """Guarda o actualiza el historial de un trabajador."""
+        query = """
+            INSERT INTO historial (id_registro, faltas_injustificadas, fecha)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+            faltas_injustificadas = VALUES(faltas_injustificadas)
+        """
+        result = self.execute_query(query, (id_registro, faltas, fecha))
+        return result is None
+
+    def obtener_historial_por_id_registro(self, id_registro: int, fecha: str = None) -> List[Dict]:
+        """Obtiene el historial por id_registro."""
+        if fecha:
+            query = """
+                SELECT * FROM historial 
+                WHERE id_registro = %s AND fecha = %s
+            """
+            result = self.execute_query(query, (id_registro, fecha))
+            return result or []
+        else:
+            query = """
+                SELECT * FROM historial 
+                WHERE id_registro = %s 
+                ORDER BY fecha DESC
+            """
+            return self.execute_query(query, (id_registro,)) or []
+
+    def obtener_historial_por_fecha(self, id_registro: int, fecha: str) -> Optional[Dict]:
+        """Obtiene el historial de un trabajador en una fecha específica."""
+        query = """
+            SELECT * FROM historial
+            WHERE id_registro = %s AND fecha = %s
+        """
+        result = self.execute_query(query, (id_registro, fecha))
+        return result[0] if result else None
+
+    def obtener_id_registro_por_cedula(self, cedula: str, fecha: str) -> Optional[int]:
+        """Obtiene el id_registro de registro_diario por cédula y fecha."""
+        query = """
+            SELECT id_registro FROM registro_diario
+            WHERE cedula = %s AND fecha = %s
+        """
+        result = self.execute_query(query, (cedula, fecha))
+        return result[0]['id_registro'] if result else None
+
+    def actualizar_faltas(self, id_registro: int, fecha: str, faltas: int) -> bool:
+        """Actualiza las faltas de un trabajador en una fecha específica."""
+        query = """
+            UPDATE historial 
+            SET faltas_injustificadas = %s
+            WHERE id_registro = %s AND fecha = %s
+        """
+        result = self.execute_query(query, (faltas, id_registro, fecha))
+        return result is None
