@@ -53,7 +53,7 @@ class BaseView:
         cedula = entry.get().strip()
         if cedula and not cedula.isdigit():
             if label_estado:
-                label_estado.config(text="❌ La cédula solo debe contener números", fg=self.colors['error'])
+                label_estado.config(text="La cédula solo debe contener números", fg=self.colors['error'])
             else:
                 self._mostrar_mensaje("La cédula solo debe contener números", 'error')
             return False
@@ -65,7 +65,7 @@ class BaseView:
         valor = entry.get().strip()
         if valor and not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', valor):
             if label_estado:
-                label_estado.config(text="❌ Solo se permiten letras y espacios", fg=self.colors['error'])
+                label_estado.config(text="Solo se permiten letras y espacios", fg=self.colors['error'])
             else:
                 self._mostrar_mensaje("Solo se permiten letras y espacios", 'error')
             return False
@@ -77,7 +77,7 @@ class BaseView:
         valor = entry.get().strip()
         if valor and not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', valor):
             if label_estado:
-                label_estado.config(text="❌ Solo se permiten letras y espacios", fg=self.colors['error'])
+                label_estado.config(text="Solo se permiten letras y espacios", fg=self.colors['error'])
             else:
                 self._mostrar_mensaje("Solo se permiten letras y espacios", 'error')
             return False
@@ -89,7 +89,7 @@ class BaseView:
         motivo = entry.get().strip()
         if motivo and not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', motivo):
             if label_estado:
-                label_estado.config(text="❌ El motivo solo puede contener letras y espacios", fg=self.colors['error'])
+                label_estado.config(text="El motivo solo puede contener letras y espacios", fg=self.colors['error'])
             else:
                 self._mostrar_mensaje("El motivo solo puede contener letras y espacios", 'error')
             return False

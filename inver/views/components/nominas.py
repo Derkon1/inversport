@@ -184,11 +184,11 @@ class NominasView:
         btn_frame = tk.Frame(main_panel, bg=self.colors['bg_main'])
         btn_frame.pack(fill='x', pady=4)
 
-        self._crear_boton(btn_frame, "AGREGAR", self._agregar_produccion, 'success').pack(side='left', padx=2)
-        self._crear_boton(btn_frame, "MODIFICAR", self._modificar_produccion, 'warning').pack(side='left', padx=2)
-        self._crear_boton(btn_frame, "ELIMINAR", self._eliminar_produccion, 'danger').pack(side='left', padx=2)
-        self._crear_boton(btn_frame, "CALCULAR NÓMINA", self._abrir_calculo_nomina, 'info').pack(side='left', padx=2)
-        self._crear_boton(btn_frame, "📊 EXPORTAR EXCEL", self._exportar_produccion_excel, 'info').pack(side='left', padx=2)
+        self._crear_boton(btn_frame, "AGREGAR", self._agregar_produccion, 'success').pack(side='left', padx=2, expand=True, fill='x')
+        self._crear_boton(btn_frame, "MODIFICAR", self._modificar_produccion, 'warning').pack(side='left', padx=2, expand=True, fill='x')
+        self._crear_boton(btn_frame, "ELIMINAR", self._eliminar_produccion, 'danger').pack(side='left', padx=2, expand=True, fill='x')
+        self._crear_boton(btn_frame, "CALCULAR NÓMINA", self._abrir_calculo_nomina, 'info').pack(side='left', padx=2, expand=True, fill='x')
+        self._crear_boton(btn_frame, "EXPORTAR EXCEL", self._exportar_produccion_excel, 'info').pack(side='left', padx=2, expand=True, fill='x')
 
         self._actualizar_listas_combos()
 
@@ -196,7 +196,7 @@ class NominasView:
         """Exporta los registros de producción visibles en la tabla a un archivo Excel."""
         seleccion = self.combo_nomina_trabajador.get()
         if not seleccion:
-            self._mostrar_mensaje("⚠️ Seleccione un trabajador para exportar", 'warning')
+            self._mostrar_mensaje("Seleccione un trabajador para exportar", 'warning')
             return
 
         try:
@@ -205,7 +205,7 @@ class NominasView:
             from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
             from openpyxl.utils import get_column_letter
         except ImportError:
-            self._mostrar_mensaje("La librería openpyxl no está instalada. Instálala con: pip install openpyxl", 'error')
+            self._mostrar_mensaje("error",'error')
             return
 
         items = self.tree_produccion.get_children()
@@ -313,10 +313,10 @@ class NominasView:
             for col_idx in range(1, 9):
                 col_letter = get_column_letter(col_idx)
                 ws.column_dimensions[col_letter].width = 15
-            ws.column_dimensions['B'].width = 12  # Ticket más angosto
-            ws.column_dimensions['D'].width = 12  # Color
-            ws.column_dimensions['E'].width = 10  # Pares
-            ws.column_dimensions['F'].width = 10  # Pedido
+            ws.column_dimensions['B'].width = 12
+            ws.column_dimensions['D'].width = 12
+            ws.column_dimensions['E'].width = 10
+            ws.column_dimensions['F'].width = 10
 
             wb.save(archivo)
             self._mostrar_mensaje(f"Producción exportada correctamente a {archivo}", 'success')
@@ -533,10 +533,50 @@ class NominasView:
     def _abrir_calculo_nomina(self):
         top = tk.Toplevel(self.root)
         top.title("Cálculo de Nómina")
-        top.geometry("700x750")
+        top.geometry("540x630")
+        top.minsize(500, 550)
         top.configure(bg=self.colors['bg_dark'])
         top.grab_set()
         top.transient(self.root)
+
+        # ===== FIX DEL BUG DE BLOQUEO =====
+        top._is_destroying = False
+        
+        def on_root_unmap(event):
+            if not top._is_destroying:
+                top._is_destroying = True
+                try:
+                    top.destroy()
+                except:
+                    pass
+        
+        def on_top_destroy(event):
+            top._is_destroying = True
+            try:
+                self.root.unbind('<Unmap>', binding_id)
+            except:
+                pass
+            try:
+                top.grab_release()
+            except:
+                pass
+        
+        binding_id = self.root.bind('<Unmap>', on_root_unmap)
+        top.bind('<Destroy>', on_top_destroy)
+        
+        def on_closing():
+            top._is_destroying = True
+            try:
+                self.root.unbind('<Unmap>', binding_id)
+            except:
+                pass
+            try:
+                top.grab_release()
+            except:
+                pass
+            top.destroy()
+        
+        top.protocol("WM_DELETE_WINDOW", on_closing)
 
         periodo_var = tk.StringVar(value="Quincenal")
         salario_minimo_var = tk.StringVar(value="130.00")
@@ -548,91 +588,87 @@ class NominasView:
         inces_porc_var = tk.StringVar(value="0.5")
 
         main_frame = tk.Frame(top, bg=self.colors['bg_main'])
-        main_frame.pack(fill='both', expand=True, padx=15, pady=15)
+        main_frame.pack(fill='both', expand=True, padx=10, pady=8)
 
-        tk.Label(main_frame, text="💰 Cálculo de Nómina", font=('Segoe UI', 16, 'bold'),
-                 bg=self.colors['bg_main'], fg=self.colors['accent']).pack(pady=(0,10))
+        tk.Label(main_frame, text="💰 Cálculo de Nómina", font=('Segoe UI', 13, 'bold'),
+                 bg=self.colors['bg_main'], fg=self.colors['accent']).pack(pady=(4, 6))
 
         sel_frame = tk.Frame(main_frame, bg=self.colors['card_bg'])
-        sel_frame.pack(fill='x', pady=5)
+        sel_frame.pack(fill='x', pady=3)
         sel_frame.config(highlightbackground=self.colors['border'], highlightthickness=1)
 
-        tk.Label(sel_frame, text="Trabajador:", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['text_light']).pack(side='left', padx=(6,3), pady=4)
-        combo_trab = ttk.Combobox(sel_frame, font=('Segoe UI', 9), width=30)
-        combo_trab.pack(side='left', padx=(0,8), pady=4)
+        tk.Label(sel_frame, text="Trabajador:", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['text_light']).pack(side='left', padx=(6, 3), pady=3)
+        combo_trab = ttk.Combobox(sel_frame, font=('Segoe UI', 8), width=28)
+        combo_trab.pack(side='left', padx=(0, 6), pady=3)
         combo_trab['values'] = [f"{cedula} - {t.nombre}" for cedula, t in self.nomina.trabajadores.items()]
 
-        params_frame = tk.LabelFrame(main_frame, text="Parámetros de Cálculo", font=('Segoe UI', 10, 'bold'),
-                                     bg=self.colors['card_bg'], fg=self.colors['accent'], bd=2, relief='groove')
-        params_frame.pack(fill='x', pady=8)
+        params_frame = tk.LabelFrame(main_frame, text="Parámetros", font=('Segoe UI', 8, 'bold'),
+                                     bg=self.colors['card_bg'], fg=self.colors['accent'], bd=1, relief='groove')
+        params_frame.pack(fill='x', pady=3)
 
         params_inner = tk.Frame(params_frame, bg=self.colors['card_bg'])
-        params_inner.pack(padx=10, pady=8, fill='x')
+        params_inner.pack(padx=5, pady=3, fill='x')
 
         for i in range(4):
             params_inner.columnconfigure(i, weight=1)
 
-        tk.Label(params_inner, text="Período:", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=0, sticky='w', padx=2)
-        combo_periodo = ttk.Combobox(params_inner, textvariable=periodo_var, values=['Quincenal', 'Mensual'], width=12, font=('Segoe UI', 8))
-        combo_periodo.grid(row=1, column=0, sticky='ew', padx=2, pady=2)
+        # Fila 1
+        tk.Label(params_inner, text="Período:", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=0, sticky='w', padx=2)
+        combo_periodo = ttk.Combobox(params_inner, textvariable=periodo_var, values=['Quincenal', 'Mensual'], width=8, font=('Segoe UI', 7))
+        combo_periodo.grid(row=1, column=0, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="Salario Mínimo (Bs):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=1, sticky='w', padx=2)
-        entry_sal_min = tk.Entry(params_inner, textvariable=salario_minimo_var, width=12, font=('Segoe UI', 8),
+        tk.Label(params_inner, text="Salario Mínimo:", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=1, sticky='w', padx=2)
+        entry_sal_min = tk.Entry(params_inner, textvariable=salario_minimo_var, width=8, font=('Segoe UI', 7),
                                  bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_sal_min.grid(row=1, column=1, sticky='ew', padx=2, pady=2)
+        entry_sal_min.grid(row=1, column=1, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="Cestaticket diario (Bs):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=2, sticky='w', padx=2)
-        entry_cestaticket = tk.Entry(params_inner, textvariable=cestaticket_diario_var, width=12, font=('Segoe UI', 8),
+        tk.Label(params_inner, text="Cestaticket:", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=2, sticky='w', padx=2)
+        entry_cestaticket = tk.Entry(params_inner, textvariable=cestaticket_diario_var, width=8, font=('Segoe UI', 7),
                                      bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_cestaticket.grid(row=1, column=2, sticky='ew', padx=2, pady=2)
+        entry_cestaticket.grid(row=1, column=2, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="LOPCYMAT (%):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=3, sticky='w', padx=2)
-        entry_lopcymat = tk.Entry(params_inner, textvariable=lopcymat_porc_var, width=12, font=('Segoe UI', 8),
+        tk.Label(params_inner, text="LOPCYMAT (%):", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=0, column=3, sticky='w', padx=2)
+        entry_lopcymat = tk.Entry(params_inner, textvariable=lopcymat_porc_var, width=8, font=('Segoe UI', 7),
                                   bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_lopcymat.grid(row=1, column=3, sticky='ew', padx=2, pady=2)
+        entry_lopcymat.grid(row=1, column=3, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="IVSS Patronal (%):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=0, sticky='w', padx=2)
-        entry_ivss_pat = tk.Entry(params_inner, textvariable=ivss_patronal_porc_var, width=12, font=('Segoe UI', 8),
+        # Fila 2
+        tk.Label(params_inner, text="IVSS Patronal (%):", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=0, sticky='w', padx=2)
+        entry_ivss_pat = tk.Entry(params_inner, textvariable=ivss_patronal_porc_var, width=8, font=('Segoe UI', 7),
                                   bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_ivss_pat.grid(row=3, column=0, sticky='ew', padx=2, pady=2)
+        entry_ivss_pat.grid(row=3, column=0, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="IVSS Trabajador (%):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=1, sticky='w', padx=2)
-        entry_ivss_trab = tk.Entry(params_inner, textvariable=ivss_trab_porc_var, width=12, font=('Segoe UI', 8),
+        tk.Label(params_inner, text="IVSS Trabajador (%):", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=1, sticky='w', padx=2)
+        entry_ivss_trab = tk.Entry(params_inner, textvariable=ivss_trab_porc_var, width=8, font=('Segoe UI', 7),
                                    bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_ivss_trab.grid(row=3, column=1, sticky='ew', padx=2, pady=2)
+        entry_ivss_trab.grid(row=3, column=1, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="FAOV (%):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=2, sticky='w', padx=2)
-        entry_faov = tk.Entry(params_inner, textvariable=faov_porc_var, width=12, font=('Segoe UI', 8),
+        tk.Label(params_inner, text="FAOV (%):", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=2, sticky='w', padx=2)
+        entry_faov = tk.Entry(params_inner, textvariable=faov_porc_var, width=8, font=('Segoe UI', 7),
                               bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_faov.grid(row=3, column=2, sticky='ew', padx=2, pady=2)
+        entry_faov.grid(row=3, column=2, sticky='ew', padx=2, pady=1)
 
-        tk.Label(params_inner, text="INCES (%):", font=('Segoe UI', 8), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=3, sticky='w', padx=2)
-        entry_inces = tk.Entry(params_inner, textvariable=inces_porc_var, width=12, font=('Segoe UI', 8),
+        tk.Label(params_inner, text="INCES (%):", font=('Segoe UI', 7), bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=2, column=3, sticky='w', padx=2)
+        entry_inces = tk.Entry(params_inner, textvariable=inces_porc_var, width=8, font=('Segoe UI', 7),
                                bg=self.colors['input_bg'], fg=self.colors['text_light'])
-        entry_inces.grid(row=3, column=3, sticky='ew', padx=2, pady=2)
+        entry_inces.grid(row=3, column=3, sticky='ew', padx=2, pady=1)
 
-        btn_calcular = self._crear_boton(main_frame, "CALCULAR", 
-                                         lambda: self._procesar_calculo_nomina(
-                                             top, combo_trab, periodo_var, salario_minimo_var,
-                                             cestaticket_diario_var, lopcymat_porc_var,
-                                             ivss_patronal_porc_var, ivss_trab_porc_var,
-                                             faov_porc_var, inces_porc_var
-                                         ), 'primary')
-        btn_calcular.pack(pady=8)
-
-        resultados_frame = tk.LabelFrame(main_frame, text="Resultados", font=('Segoe UI', 10, 'bold'),
-                                         bg=self.colors['card_bg'], fg=self.colors['accent'], bd=2, relief='groove')
-        resultados_frame.pack(fill='both', expand=True, pady=5)
+        resultados_frame = tk.LabelFrame(main_frame, text="Resultados", font=('Segoe UI', 8, 'bold'),
+                                         bg=self.colors['card_bg'], fg=self.colors['accent'], bd=1, relief='groove')
+        resultados_frame.pack(fill='both', expand=True, pady=3)
 
         results_inner = tk.Frame(resultados_frame, bg=self.colors['card_bg'])
-        results_inner.pack(padx=10, pady=8, fill='both', expand=True)
+        results_inner.pack(padx=6, pady=3, fill='both', expand=True)
 
         results_inner.columnconfigure(0, weight=1)
         results_inner.columnconfigure(1, weight=1)
 
-        tk.Label(results_inner, text="ASIGNACIONES", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['accent']).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0,4))
+        row = 0
+        # ASIGNACIONES
+        tk.Label(results_inner, text="ASIGNACIONES", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['accent']).grid(row=row, column=0, columnspan=2, sticky='w')
+        row += 1
 
         asignaciones = [
             ("Salario de producción", "0,00"),
@@ -643,23 +679,27 @@ class NominasView:
         labels_asig = {}
         for i, (text, _) in enumerate(asignaciones):
             tk.Label(results_inner, text=f"{text}:", font=('Segoe UI', 8),
-                     bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=i+1, column=0, sticky='w', pady=1)
+                     bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=row + i, column=0, sticky='w', pady=1)
             lbl = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 8, 'bold'),
                            bg=self.colors['card_bg'], fg=self.colors['success'])
-            lbl.grid(row=i+1, column=1, sticky='e', pady=1)
+            lbl.grid(row=row + i, column=1, sticky='e', pady=1)
             labels_asig[text] = lbl
 
-        tk.Label(results_inner, text="TOTAL ASIGNACIONES:", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['accent']).grid(row=len(asignaciones)+1, column=0, sticky='w', pady=(4,4))
-        top.lbl_total_asig = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 9, 'bold'),
+        row += len(asignaciones)
+        tk.Label(results_inner, text="TOTAL ASIGNACIONES:", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['accent']).grid(row=row, column=0, sticky='w', pady=(2, 1))
+        top.lbl_total_asig = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 8, 'bold'),
                                       bg=self.colors['card_bg'], fg=self.colors['success'])
-        top.lbl_total_asig.grid(row=len(asignaciones)+1, column=1, sticky='e', pady=(4,4))
+        top.lbl_total_asig.grid(row=row, column=1, sticky='e', pady=(2, 1))
+        row += 1
 
-        ttk.Separator(results_inner, orient='horizontal').grid(row=len(asignaciones)+2, column=0, columnspan=2, sticky='ew', pady=4)
+        ttk.Separator(results_inner, orient='horizontal').grid(row=row, column=0, columnspan=2, sticky='ew', pady=2)
+        row += 1
 
-        row_offset = len(asignaciones) + 3
-        tk.Label(results_inner, text="DEDUCCIONES", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['error']).grid(row=row_offset, column=0, columnspan=2, sticky='w', pady=(0,4))
+        # DEDUCCIONES
+        tk.Label(results_inner, text="DEDUCCIONES", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['error']).grid(row=row, column=0, columnspan=2, sticky='w')
+        row += 1
 
         deducciones = [
             ("IVSS (trabajador)", "0,00"),
@@ -669,31 +709,38 @@ class NominasView:
         labels_ded = {}
         for i, (text, _) in enumerate(deducciones):
             tk.Label(results_inner, text=f"{text}:", font=('Segoe UI', 8),
-                     bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=row_offset+i+1, column=0, sticky='w', pady=1)
+                     bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=row + i, column=0, sticky='w', pady=1)
             lbl = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 8, 'bold'),
                            bg=self.colors['card_bg'], fg=self.colors['error'])
-            lbl.grid(row=row_offset+i+1, column=1, sticky='e', pady=1)
+            lbl.grid(row=row + i, column=1, sticky='e', pady=1)
             labels_ded[text] = lbl
 
-        tk.Label(results_inner, text="TOTAL DEDUCCIONES:", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['error']).grid(row=row_offset+len(deducciones)+1, column=0, sticky='w', pady=(4,4))
-        top.lbl_total_ded = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 9, 'bold'),
+        row += len(deducciones)
+        tk.Label(results_inner, text="TOTAL DEDUCCIONES:", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['error']).grid(row=row, column=0, sticky='w', pady=(2, 1))
+        top.lbl_total_ded = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 8, 'bold'),
                                      bg=self.colors['card_bg'], fg=self.colors['error'])
-        top.lbl_total_ded.grid(row=row_offset+len(deducciones)+1, column=1, sticky='e', pady=(4,4))
+        top.lbl_total_ded.grid(row=row, column=1, sticky='e', pady=(2, 1))
+        row += 1
 
-        ttk.Separator(results_inner, orient='horizontal').grid(row=row_offset+len(deducciones)+2, column=0, columnspan=2, sticky='ew', pady=4)
+        ttk.Separator(results_inner, orient='horizontal').grid(row=row, column=0, columnspan=2, sticky='ew', pady=2)
+        row += 1
 
-        tk.Label(results_inner, text="NETO A PAGAR:", font=('Segoe UI', 11, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['accent']).grid(row=row_offset+len(deducciones)+3, column=0, sticky='w', pady=4)
-        top.lbl_neto = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 12, 'bold'),
+        # NETO
+        tk.Label(results_inner, text="NETO A PAGAR:", font=('Segoe UI', 10, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['accent']).grid(row=row, column=0, sticky='w', pady=3)
+        top.lbl_neto = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 10, 'bold'),
                                 bg=self.colors['card_bg'], fg=self.colors['accent'])
-        top.lbl_neto.grid(row=row_offset+len(deducciones)+3, column=1, sticky='e', pady=4)
+        top.lbl_neto.grid(row=row, column=1, sticky='e', pady=3)
+        row += 1
 
-        ttk.Separator(results_inner, orient='horizontal').grid(row=row_offset+len(deducciones)+4, column=0, columnspan=2, sticky='ew', pady=4)
+        ttk.Separator(results_inner, orient='horizontal').grid(row=row, column=0, columnspan=2, sticky='ew', pady=2)
+        row += 1
 
-        row_offset2 = row_offset + len(deducciones) + 5
-        tk.Label(results_inner, text="APORTES PATRONALES", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['warning']).grid(row=row_offset2, column=0, columnspan=2, sticky='w', pady=(0,4))
+        # APORTES PATRONALES
+        tk.Label(results_inner, text="APORTES PATRONALES", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['warning']).grid(row=row, column=0, columnspan=2, sticky='w')
+        row += 1
 
         patronales = [
             ("IVSS patronal", "0,00"),
@@ -702,27 +749,51 @@ class NominasView:
         labels_pat = {}
         for i, (text, _) in enumerate(patronales):
             tk.Label(results_inner, text=f"{text}:", font=('Segoe UI', 8),
-                     bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=row_offset2+i+1, column=0, sticky='w', pady=1)
+                     bg=self.colors['card_bg'], fg=self.colors['text_gray']).grid(row=row + i, column=0, sticky='w', pady=1)
             lbl = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 8, 'bold'),
                            bg=self.colors['card_bg'], fg=self.colors['warning'])
-            lbl.grid(row=row_offset2+i+1, column=1, sticky='e', pady=1)
+            lbl.grid(row=row + i, column=1, sticky='e', pady=1)
             labels_pat[text] = lbl
 
-        tk.Label(results_inner, text="TOTAL APORTES PATRONALES:", font=('Segoe UI', 9, 'bold'),
-                 bg=self.colors['card_bg'], fg=self.colors['warning']).grid(row=row_offset2+len(patronales)+1, column=0, sticky='w', pady=(4,4))
-        top.lbl_total_pat = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 9, 'bold'),
+        row += len(patronales)
+        tk.Label(results_inner, text="TOTAL APORTES PATRONALES:", font=('Segoe UI', 8, 'bold'),
+                 bg=self.colors['card_bg'], fg=self.colors['warning']).grid(row=row, column=0, sticky='w', pady=(2, 1))
+        top.lbl_total_pat = tk.Label(results_inner, text="Bs 0,00", font=('Segoe UI', 8, 'bold'),
                                      bg=self.colors['card_bg'], fg=self.colors['warning'])
-        top.lbl_total_pat.grid(row=row_offset2+len(patronales)+1, column=1, sticky='e', pady=(4,4))
+        top.lbl_total_pat.grid(row=row, column=1, sticky='e', pady=(2, 1))
 
         top.labels = {**labels_asig, **labels_ded, **labels_pat}
         top.resultados = {}
 
+        # ===== BOTONES EN UNA SOLA FILA =====
         btn_frame = tk.Frame(main_frame, bg=self.colors['bg_main'])
-        btn_frame.pack(fill='x', pady=8)
+        btn_frame.pack(fill='x', pady=4)
 
-        self._crear_boton(btn_frame, "EXPORTAR A EXCEL", 
-                         lambda: self._exportar_calculo_excel(top), 'info').pack(side='left', padx=4)
-        self._crear_boton(btn_frame, "CERRAR", top.destroy, 'danger').pack(side='left', padx=4)
+        btn_calcular = tk.Button(btn_frame, text="CALCULAR", 
+                                 command=lambda: self._procesar_calculo_nomina(
+                                     top, combo_trab, periodo_var, salario_minimo_var,
+                                     cestaticket_diario_var, lopcymat_porc_var,
+                                     ivss_patronal_porc_var, ivss_trab_porc_var,
+                                     faov_porc_var, inces_porc_var
+                                 ),
+                                 bg=self.colors['accent'], fg='white', 
+                                 font=('Segoe UI', 8, 'bold'),
+                                 relief='flat', padx=6, pady=4)
+        btn_calcular.pack(side='left', padx=2, expand=True, fill='x')
+        
+        btn_exportar = tk.Button(btn_frame, text="EXPORTAR", 
+                                 command=lambda: self._exportar_calculo_excel(top),
+                                 bg=self.colors['info'], fg='white',
+                                 font=('Segoe UI', 8, 'bold'),
+                                 relief='flat', padx=6, pady=4)
+        btn_exportar.pack(side='left', padx=2, expand=True, fill='x')
+        
+        btn_cerrar = tk.Button(btn_frame, text="CERRAR", 
+                               command=on_closing,
+                               bg=self.colors['error'], fg='white',
+                               font=('Segoe UI', 8, 'bold'),
+                               relief='flat', padx=6, pady=4)
+        btn_cerrar.pack(side='left', padx=2, expand=True, fill='x')
 
     def _procesar_calculo_nomina(self, top, combo_trab, periodo_var, salario_minimo_var,
                                  cestaticket_diario_var, lopcymat_porc_var,

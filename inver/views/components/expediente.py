@@ -557,21 +557,47 @@ class ExpedienteView:
         ventana.grab_set()
         ventana.transient(self.root)
 
+        # ===== FIX DEL BUG DE BLOQUEO =====
+        ventana._is_destroying = False
+        binding_id = None
+        
         def on_root_unmap(e):
-            try:
-                ventana.destroy()
-            except:
-                pass
-                
-        binding_id = self.root.bind('<Unmap>', on_root_unmap)
+            if not ventana._is_destroying:
+                ventana._is_destroying = True
+                try:
+                    ventana.destroy()
+                except:
+                    pass
         
         def on_ventana_destroy(e):
+            ventana._is_destroying = True
+            if binding_id is not None:
+                try:
+                    self.root.unbind('<Unmap>', binding_id)
+                except:
+                    pass
             try:
-                self.root.unbind('<Unmap>', binding_id)
+                ventana.grab_release()
             except:
                 pass
-                
+        
+        binding_id = self.root.bind('<Unmap>', on_root_unmap)
         ventana.bind('<Destroy>', on_ventana_destroy)
+        
+        def on_closing():
+            ventana._is_destroying = True
+            if binding_id is not None:
+                try:
+                    self.root.unbind('<Unmap>', binding_id)
+                except:
+                    pass
+            try:
+                ventana.grab_release()
+            except:
+                pass
+            ventana.destroy()
+        
+        ventana.protocol("WM_DELETE_WINDOW", on_closing)
 
         main_frame = tk.Frame(ventana, bg=self.colors['bg_main'])
         main_frame.pack(fill='both', expand=True, padx=15, pady=15)
@@ -650,4 +676,4 @@ class ExpedienteView:
             tk.Label(derecha, text=trabajador.condiciones_medicas, font=('Segoe UI', 9),
                      bg=self.colors['card_bg'], fg=self.colors['text_light'], wraplength=250, justify='left').pack(anchor='w', padx=10, pady=2)
 
-        self._crear_boton(main_frame, "CERRAR", ventana.destroy, 'danger').pack(pady=10)
+        self._crear_boton(main_frame, "CERRAR", on_closing, 'danger').pack(pady=10)

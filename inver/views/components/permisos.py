@@ -126,7 +126,7 @@ class PermisosView:
             return
         seleccion = self.combo_permiso_trabajador.get()
         if not seleccion:
-            self._mostrar_mensaje("⚠️ Seleccione un trabajador", 'warning')
+            self._mostrar_mensaje("Seleccione un trabajador", 'warning')
             return
         cedula = seleccion.split(" - ")[0]
         tipo = self.combo_tipo_permiso.get()
@@ -135,7 +135,7 @@ class PermisosView:
         fecha_inicio = self.entry_fecha_inicio.get()
         fecha_fin = self.entry_fecha_fin.get()
         if not tipo or not dias or not motivo:
-            self._mostrar_mensaje("⚠️ Complete todos los campos", 'warning')
+            self._mostrar_mensaje("Complete todos los campos", 'warning')
             return
         if not self._validar_motivo(self.entry_motivo, self.current_mensaje_label):
             return
@@ -145,17 +145,34 @@ class PermisosView:
                 self._mostrar_mensaje("Los días deben ser un número positivo", 'warning')
                 return
         except ValueError:
-            self._mostrar_mensaje("⚠️ Días inválidos (debe ser un número entero)", 'error')
+            self._mostrar_mensaje("Días inválidos (debe ser un número entero)", 'error')
             return
         resultado, mensaje = self.nomina.registrar_permiso(cedula, tipo, dias, motivo, fecha_inicio, fecha_fin)
         self._mostrar_mensaje(mensaje, 'success' if resultado else 'error')
+        
         if resultado:
+            # Limpiar formulario
             self.combo_tipo_permiso.set('')
             self.entry_dias_permiso.delete(0, tk.END)
             self.entry_motivo.delete(0, tk.END)
+            
+            # Actualizar todas las vistas
             if hasattr(self, 'actualizar_lista_activos'):
                 self.actualizar_lista_activos()
             self._actualizar_permisos_activos()
+            self._actualizar_listas_combos()
+            
+            # Actualizar también el historial si está visible
+            try:
+                if hasattr(self, 'combo_historial') and self.combo_historial.winfo_exists():
+                    seleccion_hist = self.combo_historial.get()
+                    if seleccion_hist:
+                        cedula_hist = seleccion_hist.split(" - ")[0]
+                        if hasattr(self, 'entry_fecha_historial'):
+                            fecha_hist = self.entry_fecha_historial.get()
+                            self._cargar_historial(cedula_hist, fecha_hist)
+            except:
+                pass
 
     def _crear_tab_permisos_activos(self, parent):
         frame = tk.Frame(parent, bg=self.colors['bg_main'])
@@ -195,6 +212,10 @@ class PermisosView:
                     p.dias,
                     p.motivo
                 ), tags=(cedula, str(idx)))
+        
+        # Actualizar la lista de activos después de actualizar permisos
+        if hasattr(self, 'actualizar_lista_activos'):
+            self.actualizar_lista_activos()
 
     def _modificar_permiso(self):
         seleccion = self.tree_permisos_activos.selection()
@@ -221,30 +242,57 @@ class PermisosView:
     def _abrir_dialogo_modificar_permiso(self, cedula, indice, permiso):
         dialog = tk.Toplevel(self.root)
         dialog.title("Modificar Permiso")
-        dialog.geometry("480x380")
+        dialog.geometry("460x360")
         dialog.configure(bg=self.colors['bg_dark'])
         dialog.grab_set()
         dialog.transient(self.root)
 
+        # ===== FIX DEL BUG DE BLOQUEO =====
+        dialog._is_destroying = False
         binding_id = None
         
         def on_root_unmap(e):
-            dialog.destroy()
+            if not dialog._is_destroying:
+                dialog._is_destroying = True
+                try:
+                    dialog.destroy()
+                except:
+                    pass
         
         def on_dialog_destroy(e):
+            dialog._is_destroying = True
             if binding_id is not None:
                 try:
                     self.root.unbind('<Unmap>', binding_id)
                 except:
                     pass
+            try:
+                dialog.grab_release()
+            except:
+                pass
         
         binding_id = self.root.bind('<Unmap>', on_root_unmap)
         dialog.bind('<Destroy>', on_dialog_destroy)
+        
+        def on_closing():
+            dialog._is_destroying = True
+            if binding_id is not None:
+                try:
+                    self.root.unbind('<Unmap>', binding_id)
+                except:
+                    pass
+            try:
+                dialog.grab_release()
+            except:
+                pass
+            dialog.destroy()
+        
+        dialog.protocol("WM_DELETE_WINDOW", on_closing)
 
         trabajador = self.nomina.trabajadores.get(cedula)
         if not trabajador:
             messagebox.showerror("Error", "Trabajador no encontrado")
-            dialog.destroy()
+            on_closing()
             return
 
         main_frame = tk.Frame(dialog, bg=self.colors['bg_dark'])
@@ -336,7 +384,7 @@ class PermisosView:
 
             resultado, mensaje = self.nomina.modificar_permiso(cedula, indice, nuevo_permiso)
             if resultado:
-                dialog.destroy()
+                on_closing()
                 self._mostrar_mensaje(mensaje, 'success')
                 self._actualizar_permisos_activos()
                 if hasattr(self, 'actualizar_lista_activos'):
@@ -347,7 +395,7 @@ class PermisosView:
         btn_frame = tk.Frame(main_frame, bg=self.colors['bg_dark'])
         btn_frame.pack(pady=8)
         self._crear_boton(btn_frame, "GUARDAR", guardar, 'success').pack(side='left', padx=4)
-        self._crear_boton(btn_frame, "CANCELAR", dialog.destroy, 'danger').pack(side='left', padx=4)
+        self._crear_boton(btn_frame, "CANCELAR", on_closing, 'danger').pack(side='left', padx=4)
 
     def _eliminar_permiso(self):
         seleccion = self.tree_permisos_activos.selection()
@@ -371,3 +419,15 @@ class PermisosView:
             self._actualizar_permisos_activos()
             if hasattr(self, 'actualizar_lista_activos'):
                 self.actualizar_lista_activos()
+            
+            # Actualizar también el historial si está visible
+            try:
+                if hasattr(self, 'combo_historial') and self.combo_historial.winfo_exists():
+                    seleccion_hist = self.combo_historial.get()
+                    if seleccion_hist:
+                        cedula_hist = seleccion_hist.split(" - ")[0]
+                        if hasattr(self, 'entry_fecha_historial'):
+                            fecha_hist = self.entry_fecha_historial.get()
+                            self._cargar_historial(cedula_hist, fecha_hist)
+            except:
+                pass

@@ -82,11 +82,11 @@ class TrabajadoresView:
         cargo = self.combo_cargo_nuevo.get().strip()
 
         if not cedula or not nombres or not apellidos or not cargo:
-            self._mostrar_mensaje("⚠️ Complete todos los campos", 'warning')
+            self._mostrar_mensaje("Complete todos los campos", 'warning')
             return
         if not cedula.isdigit():
             self._mostrar_mensaje("La cédula solo debe contener números", 'error')
-            self.current_mensaje_label.config(text="❌ Cédula inválida", fg=self.colors['error'])
+            self.current_mensaje_label.config(text="Cédula inválida", fg=self.colors['error'])
             return
         if not self._validar_nombres(self.entry_nombres_nuevo, self.current_mensaje_label):
             return
@@ -150,7 +150,7 @@ class TrabajadoresView:
         seleccion = self.combo_actualizar_cargo.get()
         nuevo_cargo = self.combo_nuevo_cargo.get().strip()
         if not seleccion or not nuevo_cargo:
-            self._mostrar_mensaje("⚠️ Complete todos los campos", 'warning')
+            self._mostrar_mensaje("Complete todos los campos", 'warning')
             return
         cedula = seleccion.split(" - ")[0]
         trabajador = self.nomina.trabajadores.get(cedula)
@@ -173,7 +173,7 @@ class TrabajadoresView:
     def eliminar_trabajador_func(self):
         seleccion = self.combo_actualizar_cargo.get()
         if not seleccion:
-            self._mostrar_mensaje("⚠️ Seleccione un trabajador", 'warning')
+            self._mostrar_mensaje("Seleccione un trabajador", 'warning')
             return
         cedula = seleccion.split(" - ")[0]
         nombre = seleccion.split(" - ")[1]

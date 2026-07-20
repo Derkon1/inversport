@@ -27,10 +27,9 @@ class Database:
                 password=self.password
             )
             self.cursor = self.connection.cursor(dictionary=True)
-            print(f"✅ Conectado a la base de datos: {self.database}")
             return True
         except Error as e:
-            print(f"❌ Error al conectar: {e}")
+            print(f"Error al conectar: {e}")
             return False
 
     def disconnect(self):
@@ -39,7 +38,7 @@ class Database:
             self.cursor.close()
         if self.connection:
             self.connection.close()
-            print("🔌 Conexión cerrada")
+            print("Conexión cerrada")
 
     def execute_query(self, query: str, params: tuple = None) -> Optional[List[Dict]]:
         """Ejecuta una consulta y retorna los resultados con manejo de concurrencia."""
@@ -71,12 +70,12 @@ class Database:
                 
                 if "Record has changed since last read" in str(e) or "1020" in str(e):
                     if attempt < max_retries - 1:
-                        print(f"⚠️ Reintentando ({attempt + 1}/{max_retries})...")
+                        print(f"Reintentando ({attempt + 1}/{max_retries})...")
                         self.disconnect()
                         continue
                 return None
             except Exception as e:
-                print(f"❌ Error inesperado: {e}")
+                print(f"Error: {e}")
                 return None
         return None
 

@@ -126,12 +126,12 @@ class RegistroView:
             return
         if not cedula.isdigit():
             self.entry_nombre.set('')
-            self.label_estado.config(text="❌ La cédula solo debe contener números", fg=self.colors['error'])
+            self.label_estado.config(text="La cédula solo debe contener números", fg=self.colors['error'])
             return
         trabajador = self.nomina.trabajadores.get(cedula)
         if not trabajador:
             self.entry_nombre.set('')
-            self.label_estado.config(text="❌ TRABAJADOR NO ENCONTRADO", fg=self.colors['error'])
+            self.label_estado.config(text="TRABAJADOR NO ENCONTRADO", fg=self.colors['error'])
             return
         estado, tipo = trabajador.get_estado_hoy()
         colores_estado = {'success': self.colors['success'], 'warning': self.colors['warning'],
@@ -143,11 +143,11 @@ class RegistroView:
     def registrar_entrada(self):
         cedula = self.entry_cedula.get().strip()
         if not cedula:
-            self._mostrar_mensaje("⚠️ Ingrese una cédula", 'warning')
+            self._mostrar_mensaje("Ingrese una cédula", 'warning')
             return
         if not cedula.isdigit():
             self._mostrar_mensaje("La cédula solo debe contener números", 'error')
-            self.label_estado.config(text="❌ Cédula inválida", fg=self.colors['error'])
+            self.label_estado.config(text="Cédula inválida", fg=self.colors['error'])
             return
         resultado, mensaje = self.nomina.registrar_entrada(cedula)
         if resultado:
@@ -168,11 +168,11 @@ class RegistroView:
     def registrar_salida(self):
         cedula = self.entry_cedula.get().strip()
         if not cedula:
-            self._mostrar_mensaje("⚠️ Ingrese una cédula", 'warning')
+            self._mostrar_mensaje("Ingrese una cédula", 'warning')
             return
         if not cedula.isdigit():
             self._mostrar_mensaje("La cédula solo debe contener números", 'error')
-            self.label_estado.config(text="❌ Cédula inválida", fg=self.colors['error'])
+            self.label_estado.config(text="Cédula inválida", fg=self.colors['error'])
             return
         resultado, mensaje = self.nomina.registrar_salida(cedula)
         if resultado:

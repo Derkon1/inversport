@@ -249,7 +249,6 @@ class DatabaseManager:
         self.cargar_produccion(nomina)
         self.cargar_expediente(nomina)
         self._actualizar_historial_faltas(nomina)
-        print("✅ Datos sincronizados correctamente")
 
     def _actualizar_historial_faltas(self, nomina) -> None:
         """Actualiza el historial de faltas para todos los trabajadores."""

@@ -41,8 +41,9 @@ class HistorialView:
         frame_tabla = tk.Frame(frame, bg=self.colors['bg_main'])
         frame_tabla.pack(fill='both', expand=True, padx=15, pady=8)
 
-        self.tree_registros = ttk.Treeview(frame_tabla, columns=('Fecha','Entrada','Salida','Horas','Faltas'), show='headings', height=12)
-        cols = [('Fecha',100), ('Entrada',80), ('Salida',80), ('Horas',80), ('Faltas',60)]
+        # Añadir columna de Estado (Permiso)
+        self.tree_registros = ttk.Treeview(frame_tabla, columns=('Fecha','Entrada','Salida','Horas','Faltas','Estado'), show='headings', height=12)
+        cols = [('Fecha',100), ('Entrada',100), ('Salida',100), ('Horas',80), ('Faltas',60), ('Estado',150)]
         for col, w in cols:
             self.tree_registros.heading(col, text=col)
             self.tree_registros.column(col, width=w, anchor='center')
@@ -61,72 +62,113 @@ class HistorialView:
         fecha = self.entry_fecha_historial.get()
         self._cargar_historial(cedula, fecha)
 
+    def _calcular_falta(self, registro, fecha):
+        """Calcula si un trabajador tuvo falta en una fecha específica."""
+        if registro:
+            return 0
+            
+        fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+        hoy = datetime.now().date()
+        
+        # Solo contar faltas en días laborales (lunes a viernes)
+        if fecha_obj.weekday() >= 5:  # Sábado o Domingo
+            return 0
+            
+        # Si es hoy, verificar si ya pasó la hora límite
+        if fecha_obj == hoy:
+            hora_actual = datetime.now().time()
+            hora_limite = datetime.strptime(self.HORA_LIMITE, "%H:%M").time()
+            return 1 if hora_actual >= hora_limite else 0
+        
+        # Si es una fecha pasada, es falta
+        if fecha_obj < hoy:
+            return 1
+            
+        return 0
+
     def _cargar_historial(self, cedula, fecha):
-        """Carga el historial desde la base de datos."""
+        """Carga el historial desde la base de datos o lo calcula en memoria."""
         trabajador = self.nomina.trabajadores.get(cedula)
         if not trabajador:
             self._mostrar_mensaje("Trabajador no encontrado", 'error')
             return
 
+        # Limpiar tabla
         for item in self.tree_registros.get_children():
             self.tree_registros.delete(item)
 
-        # Intentar cargar desde la base de datos
+        # Verificar si el trabajador tiene permiso en esta fecha
+        permiso = trabajador.tiene_permiso_en_fecha(fecha)
+        if permiso:
+            # Si tiene permiso, mostrar eso en el historial
+            self.tree_registros.insert('', 'end', values=(
+                fecha,
+                '--',
+                '--',
+                '--',
+                0,
+                f'EN PERMISO ({permiso.tipo})'
+            ))
+            return
+
+        # Obtener registro diario del trabajador
+        registro = trabajador.get_registro_por_fecha(fecha)
+        faltas = 0
+        entrada_formateada = 'No registró'
+        salida_formateada = '--'
+        horas = '-'
+        estado = ''
+
+        # Intentar obtener del historial en la base de datos
         if hasattr(self.nomina, 'db_manager') and self.nomina.db_manager:
-            # Obtener id_registro de registro_diario
+            id_registro = self.nomina.db_manager.obtener_id_registro_por_cedula(cedula, fecha)
+            
+            if id_registro:
+                # Buscar en el historial
+                historial = self.nomina.db_manager.obtener_historial_por_fecha(id_registro, fecha)
+                
+                if historial:
+                    # Si existe en historial, usar esos datos
+                    faltas = historial.get('faltas_injustificadas', 0)
+                else:
+                    # Si no existe en historial, calcular y guardar
+                    faltas = self._calcular_falta(registro, fecha)
+                    self.nomina.db_manager.guardar_historial(id_registro, fecha, faltas)
+            else:
+                # Si no hay registro diario, calcular falta
+                faltas = self._calcular_falta(registro, fecha)
+
+        # Si hay registro, formatear los datos
+        if registro:
+            entrada_formateada = self._formato_hora_12h(registro.hora_entrada)
+            if registro.hora_salida:
+                salida_formateada = self._formato_hora_12h(registro.hora_salida)
+                horas = str(trabajador.get_horas_trabajadas_hoy() or 0)
+                estado = 'FINALIZADO'
+            else:
+                salida_formateada = '--'
+                horas = '-'
+                estado = 'EN TRABAJO'
+        else:
+            if faltas > 0:
+                estado = 'FALTA'
+            else:
+                estado = 'SIN REGISTRO'
+
+        # Mostrar en el Treeview
+        self.tree_registros.insert('', 'end', values=(
+            fecha,
+            entrada_formateada,
+            salida_formateada,
+            horas if horas != '-' else '0',
+            faltas,
+            estado
+        ))
+
+        # Si hay conexión a BD y no se guardó el historial, guardarlo ahora
+        if hasattr(self.nomina, 'db_manager') and self.nomina.db_manager:
             id_registro = self.nomina.db_manager.obtener_id_registro_por_cedula(cedula, fecha)
             if id_registro:
                 historial = self.nomina.db_manager.obtener_historial_por_fecha(id_registro, fecha)
-                if historial:
-                    # Buscar el registro diario para mostrar entrada/salida
-                    registro = trabajador.get_registro_por_fecha(fecha)
-                    entrada_formateada = '--'
-                    salida_formateada = '--'
-                    horas = '-'
-                    faltas = historial.get('faltas_injustificadas', 0)
-                    
-                    if registro:
-                        entrada_formateada = self._formato_hora_12h(registro.hora_entrada)
-                        salida_formateada = self._formato_hora_12h(registro.hora_salida) if registro.hora_salida else '--'
-                        horas = trabajador.get_horas_trabajadas_hoy() if registro.hora_salida else '-'
-                    
-                    self.tree_registros.insert('', 'end', values=(
-                        historial['fecha'],
-                        entrada_formateada,
-                        salida_formateada,
-                        horas if horas != '-' else '0',
-                        faltas
-                    ))
-                    return
-
-        # Fallback: calcular en memoria y guardar
-        registro = trabajador.get_registro_por_fecha(fecha)
-        es_falta = 0
-        
-        if registro:
-            horas = trabajador.get_horas_trabajadas_hoy() if registro.hora_salida else '-'
-            entrada_formateada = self._formato_hora_12h(registro.hora_entrada)
-            salida_formateada = self._formato_hora_12h(registro.hora_salida) if registro.hora_salida else '--'
-        else:
-            entrada_formateada = 'No registró'
-            salida_formateada = '--'
-            horas = '-'
-            fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
-            hoy = datetime.now().date()
-            if fecha_obj.weekday() < 5:
-                if fecha_obj == hoy:
-                    hora_actual = datetime.now().time()
-                    hora_limite = datetime.strptime(self.HORA_LIMITE, "%H:%M").time()
-                    es_falta = 1 if hora_actual >= hora_limite else 0
-                else:
-                    es_falta = 1
-        
-        # Guardar en la base de datos si hay conexión
-        if hasattr(self.nomina, 'db_manager') and self.nomina.db_manager:
-            id_registro = self.nomina.db_manager.obtener_id_registro_por_cedula(cedula, fecha)
-            if id_registro:
-                self.nomina.db_manager.guardar_historial(id_registro, fecha, es_falta)
-        
-        self.tree_registros.insert('', 'end', values=(
-            fecha, entrada_formateada, salida_formateada, horas, es_falta
-        ))
+                if not historial:
+                    self.nomina.db_manager.guardar_historial(id_registro, fecha, faltas)
